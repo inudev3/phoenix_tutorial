@@ -2,8 +2,8 @@ import Config
 
 # Configure your database
 config :ctx, Ctx.Repo,
-  username: "jeong-in-u",
-  password: "32518458",
+  username: "postgres",
+  password: "postgres",
   hostname: "localhost",
   database: "ctx_dev",
   stacktrace: true,
