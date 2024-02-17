@@ -112,15 +112,26 @@ defmodule Ctx.ShoppingCart do
       {:error, %Ecto.Changeset{}}
 
   """
-  def update_cart(%Cart{} = cart, attrs) do
-    cart
-    |> Cart.changeset(attrs)
-    |> Repo.update()
-  end
-
   @doc """
   Deletes a cart.
 
+  def update_cart(%Cart{} = cart, attrs) do
+    changeset =
+      cart
+      |> Cart.changeset(attrs)
+      |> Ecto.Changeset.cast_assoc(:items, with: &CartItem.changeset/2)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:cart, changeset)
+    |> Ecto.Multi.delete_all(:discarded_items, fn %{cart: cart} ->
+      from(i in CartItem, where: i.cart_id == ^cart.id and i.quantity == 0)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{cart: cart}} -> {:ok, cart}
+      {:error, :cart, changeset, _changes_so_far} -> {:error, changeset}
+    end
+  end
   ## Examples
 
       iex> delete_cart(cart)
@@ -145,6 +156,11 @@ defmodule Ctx.ShoppingCart do
   """
   def change_cart(%Cart{} = cart, attrs \\ %{}) do
     Cart.changeset(cart, attrs)
+  end
+
+  def prune_cart_items(%Cart{} = cart) do
+    {_, _} = Repo.delete_all(from(i in CartItem, where: i.cart_id == ^cart.id))
+    {:ok, reload_cart(cart)}
   end
 
   alias Ctx.ShoppingCart.CartItem
@@ -208,10 +224,23 @@ defmodule Ctx.ShoppingCart do
       {:error, %Ecto.Changeset{}}
 
   """
-  def update_cart_item(%CartItem{} = cart_item, attrs) do
-    cart_item
-    |> CartItem.changeset(attrs)
-    |> Repo.update()
+
+  def update_cart(%Cart{} = cart, attrs) do
+    changeset =
+      cart
+      |> Cart.changeset(attrs)
+      |> Ecto.Changeset.cast_assoc(:items, with: &CartItem.changeset/2)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:cart, changeset)
+    |> Ecto.Multi.delete_all(:discarded_items, fn %{cart: cart} ->
+      from(i in CartItem, where: i.cart_id == ^cart.id and i.quantity == 0)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{cart: cart}} -> {:ok, cart}
+      {:error, :cart, changeset, _changes_so_far} -> {:error, changeset}
+    end
   end
 
   @doc """
